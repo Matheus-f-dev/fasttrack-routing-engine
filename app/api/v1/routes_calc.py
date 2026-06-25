@@ -30,6 +30,47 @@ _registry = RouteStrategyRegistry()
 _executor = ThreadPoolExecutor()
 _comparison_service = RouteComparisonService()
 
+_400 = {"description": "Total package weight exceeds vehicle `max_weight`"}
+_404 = {"description": "Vehicle or package not found"}
+_422 = {"description": "Unknown strategy name"}
+
+_STRATEGY_TABLE = (
+    "| Strategy | Algorithm | Optimises for | Considers `access_cost` |\n"
+    "|---|---|---|---|\n"
+    "| `express` | Nearest-neighbor greedy | Minimum total distance | No |\n"
+    "| `economic` | Weighted nearest-neighbor | Minimum distance + cost | Yes |\n"
+    "| `strategic_hub` | Hub-cluster | Regional consolidation | Yes |\n"
+)
+
+_CAPACITY_NOTE = (
+    "> **Capacity rule:** the sum of `weight` across all requested packages "
+    "must not exceed the vehicle's `max_weight`. Returns `400` otherwise."
+)
+
+_REQUEST_EXAMPLES = {
+    "express_single": {
+        "summary": "Two packages — express strategy",
+        "value": {
+            "vehicle_id": "b7e23ec2-9428-4f3e-9e49-a9e9d13bce40",
+            "package_ids": [
+                "a3bb189e-8bf9-3888-9912-ace4e6543002",
+                "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            ],
+        },
+    },
+    "economic_single": {
+        "summary": "Three packages — economic strategy",
+        "value": {
+            "vehicle_id": "b7e23ec2-9428-4f3e-9e49-a9e9d13bce40",
+            "package_ids": [
+                "a3bb189e-8bf9-3888-9912-ace4e6543002",
+                "d290f1ee-6c54-4b01-90e6-d701748f0851",
+                "c1a2b3c4-d5e6-7890-abcd-ef1234567890",
+            ],
+        },
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -99,22 +140,29 @@ def _run_strategy(strategy: RouteStrategy, route_input: RouteInput) -> RouteResu
     response_model=RouteResponse,
     summary="Calculate a route with a single strategy",
     description=(
-        "Calculates a delivery route using the strategy selected via the `strategy` query parameter.\n\n"
-        "Available strategies:\n\n"
-        "- **express** — nearest-neighbor greedy; minimizes total distance, ignores `access_cost`\n"
-        "- **economic** — weighted nearest-neighbor; minimizes `distance + access_cost` per step\n"
-        "- **strategic_hub** — hub-cluster; detours through the nearest secondary hub to group "
-        "regional packages; respects `max_weight`\n\n"
-        "Returns `400` if total package weight exceeds vehicle capacity.\n\n"
-        "Returns `404` if vehicle or any package is not found.\n\n"
-        "Returns `422` if the strategy name is not recognised."
+        "Calculates a delivery route for the given vehicle and packages "
+        "using the strategy selected via the `strategy` query parameter.\n\n"
+        f"{_STRATEGY_TABLE}\n"
+        f"{_CAPACITY_NOTE}\n\n"
+        "The route always departs from the **main hub at (0, 0)**.\n\n"
+        "Use `POST /routes/calculate/all` to run all strategies at once and compare results."
     ),
+    responses={
+        200: {"description": "Route calculated successfully"},
+        400: _400,
+        404: _404,
+        422: _422,
+    },
+    openapi_extra={"requestBody": {"content": {"application/json": {"examples": _REQUEST_EXAMPLES}}}},
 )
 def calculate_route(
     body: RouteRequest,
     strategy: str = Query(
         default="express",
-        description="Routing strategy name. One of: `express`, `economic`, `strategic_hub`.",
+        description=(
+            "Routing strategy to apply. One of: `express`, `economic`, `strategic_hub`.\n\n"
+            "Defaults to `express` if omitted."
+        ),
         examples=["express"],
     ),
 ) -> RouteResponse:
@@ -137,23 +185,29 @@ def calculate_route(
 @router.post(
     "/calculate/all",
     response_model=AllRoutesResponse,
-    summary="Calculate routes with all strategies simultaneously",
+    summary="Calculate and compare all strategies simultaneously",
     description=(
-        "Runs **all three routing strategies in parallel** for the same vehicle and package list, "
-        "returning one route per strategy in a single response.\n\n"
-        "This allows the caller to compare strategies and pick the most suitable route.\n\n"
-        "| Field | Strategy | Optimises for |\n"
-        "|---|---|---|\n"
-        "| `express_route` | ExpressRouteStrategy | Minimum total distance |\n"
-        "| `economic_route` | EconomicRouteStrategy | Minimum distance + access cost |\n"
-        "| `strategic_route` | StrategicHubRouteStrategy | Regional hub consolidation |\n\n"
-        "Returns `400` if total package weight exceeds vehicle `max_weight`.\n\n"
-        "Returns `404` if the vehicle or any package ID is not found."
+        "Runs **all three routing strategies in parallel** for the same vehicle and package list.\n\n"
+        "Returns a unified response with:\n\n"
+        "- `express_route` — result of the Express strategy\n"
+        "- `economic_route` — result of the Economic strategy\n"
+        "- `strategic_route` — result of the Strategic Hub strategy\n"
+        "- `comparison` — automatic cross-strategy analysis including:\n"
+        "  - `shortest_route` — strategy with lowest `total_distance`\n"
+        "  - `cheapest_route` — strategy with lowest `total_cost`\n"
+        "  - `highest_utilization_route` — strategy with most packages per distance unit\n"
+        "  - `distance_saved` — distance units gained over the worst route\n"
+        "  - `cost_saved` — cost units gained over the most expensive route\n"
+        "  - `recommended` — best balanced strategy with human-readable justification\n\n"
+        f"{_STRATEGY_TABLE}\n"
+        f"{_CAPACITY_NOTE}"
     ),
     responses={
-        400: {"description": "Total package weight exceeds vehicle capacity"},
-        404: {"description": "Vehicle or package not found"},
+        200: {"description": "All routes calculated and compared successfully"},
+        400: _400,
+        404: _404,
     },
+    openapi_extra={"requestBody": {"content": {"application/json": {"examples": _REQUEST_EXAMPLES}}}},
 )
 async def calculate_all_routes(body: RouteRequest) -> AllRoutesResponse:
     vehicle = _resolve_vehicle(body.vehicle_id)
@@ -176,13 +230,17 @@ async def calculate_all_routes(body: RouteRequest) -> AllRoutesResponse:
     except VehicleCapacityExceededError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+    express_response  = _build_response(express_result)
+    economic_response = _build_response(economic_result)
+    strategic_response = _build_response(strategic_result)
+
     return AllRoutesResponse(
-        express_route=_build_response(express_result),
-        economic_route=_build_response(economic_result),
-        strategic_route=_build_response(strategic_result),
+        express_route=express_response,
+        economic_route=economic_response,
+        strategic_route=strategic_response,
         comparison=_comparison_service.compare(
-            express=_build_response(express_result),
-            economic=_build_response(economic_result),
-            strategic=_build_response(strategic_result),
+            express=express_response,
+            economic=economic_response,
+            strategic=strategic_response,
         ),
     )
