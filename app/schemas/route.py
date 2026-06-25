@@ -21,4 +21,5 @@ class DeliveryStop(BaseModel):
 class RouteResponse(BaseModel):
     route_type: str = Field(description="Strategy used to calculate this route", examples=["express"])
     total_distance: float = Field(description="Total euclidean distance of the route in map units", examples=[12.5])
+    total_cost: float = Field(description="Sum of access_cost of all delivered packages", examples=[30.0])
     delivery_order: list[DeliveryStop] = Field(description="Ordered list of delivery stops")

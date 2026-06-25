@@ -22,7 +22,7 @@ _registry = RouteStrategyRegistry()
         "Calculates an optimized delivery route for the given packages and vehicle. "
         "Use the `strategy` query parameter to select the routing algorithm:\n\n"
         "- **express** — nearest-neighbor greedy, minimizes total distance, ignores access cost\n"
-        "- **economic** — *(not yet implemented)*\n"
+        "- **economic** — weighted nearest-neighbor, minimizes distance + access_cost per step; may travel further to avoid expensive stops\n"
         "- **strategic_hub** — *(not yet implemented)*"
     ),
 )
@@ -69,5 +69,6 @@ def calculate_route(
     return RouteResponse(
         route_type=result.strategy_name,
         total_distance=result.total_distance,
+        total_cost=result.total_cost,
         delivery_order=delivery_order,
     )
