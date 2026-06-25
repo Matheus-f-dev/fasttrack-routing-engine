@@ -1,6 +1,5 @@
 from fastapi import APIRouter
+from app.api.v1 import packages
 
 router = APIRouter()
-
-# Endpoints serão registrados aqui por domínio
-# Exemplo: router.include_router(routing.router, prefix="/routing", tags=["routing"])
+router.include_router(packages.router)
