@@ -1,0 +1,41 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Always use the runtime stage (default target is the last stage)
+      target: runtime
+
+    image: fasttrack-routing-engine:latest
+
+    container_name: fasttrack-api
+
+    ports:
+      # HOST_PORT (configurable via .env) → container port 8000
+      - "${HOST_PORT:-8000}:8000"
+
+    environment:
+      # Application
+      APP_NAME:    "${APP_NAME:-FastTrack Routing Engine}"
+      APP_VERSION: "${APP_VERSION:-0.1.0}"
+      DEBUG:       "${DEBUG:-false}"
+
+      # Server tuning
+      WORKERS:   "${WORKERS:-2}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+
+    # Load optional .env file for local overrides.
+    # In CI/CD, inject secrets via the orchestrator instead.
+    env_file:
+      - path: .env
+        required: false
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+      start_period: 15s
