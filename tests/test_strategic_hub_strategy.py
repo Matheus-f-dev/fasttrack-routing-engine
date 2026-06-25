@@ -119,26 +119,27 @@ class TestStrategicHubDetour:
 
 class TestStrategicHubWeightLimit:
     def test_respects_vehicle_max_weight(self, strategy, north_hub):
-        light_vehicle = Vehicle(plate="LGT-001", max_weight=5.0)
-        # Two regional packages each weight=4, cluster=8 > max_weight=5
-        # Algorithm must drop the heaviest until cluster fits → at most 1 regional delivered via hub
+        # Total weight (4+4+1=9) fits within max_weight=10
+        # Regional cluster (p1+p2=8) exceeds max_weight of cluster alone → drops heaviest
         p1 = make_package("Heavy1", x=0.0, y=11.0, weight=4.0)
         p2 = make_package("Heavy2", x=0.0, y=12.0, weight=4.0)
         far = make_package("Far",   x=50.0, y=0.0, weight=1.0)
+        vehicle = Vehicle(plate="LGT-001", max_weight=10.0)  # total fits; cluster trimmed internally
 
         result = strategy.calculate_route(
-            make_input([p1, p2, far], light_vehicle, secondary_hubs=[north_hub])
+            make_input([p1, p2, far], vehicle, secondary_hubs=[north_hub])
         )
         regional_stops = [s for s in result.stops if s.hub is not None]
         regional_weight = sum(s.packages[0].weight for s in regional_stops)
-        assert regional_weight <= light_vehicle.max_weight
+        assert regional_weight <= vehicle.max_weight
 
     def test_all_packages_always_delivered_despite_weight_redistribution(self, strategy, north_hub):
-        light_vehicle = Vehicle(plate="LGT-002", max_weight=6.0)
-        packages = [make_package(f"P{i}", x=float(i), y=10.0, weight=2.0) for i in range(4)]
+        # 3 packages × 2kg = 6kg ≤ max_weight=10 → valid load, cluster trimming only
+        vehicle = Vehicle(plate="LGT-002", max_weight=10.0)
+        packages = [make_package(f"P{i}", x=float(i), y=10.0, weight=2.0) for i in range(3)]
 
         result = strategy.calculate_route(
-            make_input(packages, light_vehicle, secondary_hubs=[north_hub])
+            make_input(packages, vehicle, secondary_hubs=[north_hub])
         )
         delivered_ids = {s.packages[0].id for s in result.stops}
         assert delivered_ids == {p.id for p in packages}

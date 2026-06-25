@@ -27,7 +27,7 @@ class EconomicRouteStrategy(RouteStrategy):
     def _score(current: Locatable, package: Package) -> float:
         return DistanceCalculator.calculate_distance(current, _package_as_point(package)) + package.access_cost
 
-    def calculate_route(self, route_input: RouteInput) -> RouteResult:
+    def _calculate(self, route_input: RouteInput) -> RouteResult:
         remaining = list(route_input.packages)
         current: Locatable = route_input.origin
         stops: list[RouteStop] = []

@@ -19,7 +19,7 @@ class ExpressRouteStrategy(RouteStrategy):
     def name(self) -> str:
         return "express"
 
-    def calculate_route(self, route_input: RouteInput) -> RouteResult:
+    def _calculate(self, route_input: RouteInput) -> RouteResult:
         remaining = list(route_input.packages)
         current: Locatable = route_input.origin
         stops: list[RouteStop] = []

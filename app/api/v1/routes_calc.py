@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
+from app.algorithms.base import VehicleCapacityExceededError
 from app.algorithms.registry import RouteStrategyRegistry, StrategyNotFoundError
 from app.repositories.hub_repository import HubRepository
 from app.repositories.package_repository import PackageRepository
@@ -53,7 +54,10 @@ def calculate_route(
         available_hubs=_hub_repo.get_all(),
     )
 
-    result = route_strategy.calculate_route(route_input)
+    try:
+        result = route_strategy.calculate_route(route_input)
+    except VehicleCapacityExceededError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     delivery_order = [
         DeliveryStop(

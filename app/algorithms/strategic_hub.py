@@ -57,7 +57,7 @@ class StrategicHubRouteStrategy(RouteStrategy):
             if DistanceCalculator.calculate_distance(_package_as_point(p), hub) <= _REGIONAL_RADIUS
         ]
 
-    def calculate_route(self, route_input: RouteInput) -> RouteResult:
+    def _calculate(self, route_input: RouteInput) -> RouteResult:
         packages  = list(route_input.packages)
         origin    = route_input.origin
         vehicle   = route_input.vehicle
