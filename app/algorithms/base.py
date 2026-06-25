@@ -1,8 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from app.algorithms.models import RouteInput, RouteResult
 
 
-class RoutingStrategy(ABC):
+class RouteStrategy(ABC):
+    @property
     @abstractmethod
-    def execute(self, payload: Any) -> Any:
-        raise NotImplementedError
+    def name(self) -> str:
+        """Unique strategy identifier used by the registry."""
+
+    @abstractmethod
+    def calculate_route(self, route_input: RouteInput) -> RouteResult:
+        """Calculate and return a route plan for the given input."""
