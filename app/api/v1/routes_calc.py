@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from app.algorithms.registry import RouteStrategyRegistry, StrategyNotFoundError
 from app.repositories.hub_repository import HubRepository
 from app.repositories.package_repository import PackageRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.algorithms.models import RouteInput
-from app.schemas.route import DeliveryStop, RouteRequest, RouteResponse
+from app.schemas.route import DeliveryStop, RouteRequest, RouteResponse, VisitedHubResponse
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
@@ -23,7 +23,7 @@ _registry = RouteStrategyRegistry()
         "Use the `strategy` query parameter to select the routing algorithm:\n\n"
         "- **express** — nearest-neighbor greedy, minimizes total distance, ignores access cost\n"
         "- **economic** — weighted nearest-neighbor, minimizes distance + access_cost per step; may travel further to avoid expensive stops\n"
-        "- **strategic_hub** — *(not yet implemented)*"
+        "- **strategic_hub** — routes through the nearest secondary hub to collect an extra regional package; respects vehicle max_weight"
     ),
 )
 def calculate_route(
@@ -71,4 +71,11 @@ def calculate_route(
         total_distance=result.total_distance,
         total_cost=result.total_cost,
         delivery_order=delivery_order,
+        extra_package_collected=result.extra_package_collected,
+        visited_hub=VisitedHubResponse(
+            id=result.visited_hub.id,
+            name=result.visited_hub.name,
+            x=result.visited_hub.x,
+            y=result.visited_hub.y,
+        ) if result.visited_hub else None,
     )

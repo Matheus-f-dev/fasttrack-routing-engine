@@ -25,3 +25,5 @@ class RouteResult:
     total_distance: float
     total_cost: float
     strategy_name: str
+    extra_package_collected: bool = False
+    visited_hub: Hub | None = None
