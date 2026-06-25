@@ -62,6 +62,67 @@ class RouteResponse(BaseModel):
     )
 
 
+class RouteSummary(BaseModel):
+    strategy: str = Field(
+        description="Name of the routing strategy",
+        examples=["express"],
+    )
+    total_distance: float = Field(
+        description="Total euclidean distance of the route in map units",
+        examples=[12.5],
+    )
+    total_cost: float = Field(
+        description="Sum of access_cost of all delivered packages",
+        examples=[30.0],
+    )
+    stops: int = Field(
+        description="Number of delivery stops in this route",
+        examples=[4],
+    )
+
+
+class RouteRecommendation(BaseModel):
+    strategy: str = Field(
+        description="Name of the recommended routing strategy",
+        examples=["economic"],
+    )
+    reason: str = Field(
+        description="Human-readable justification for the recommendation",
+        examples=["Recommended because it offers the lowest total cost."],
+    )
+
+
+class RouteComparison(BaseModel):
+    shortest_route: RouteSummary = Field(
+        description="Strategy with the lowest total euclidean distance.",
+    )
+    cheapest_route: RouteSummary = Field(
+        description="Strategy with the lowest total access cost across all packages.",
+    )
+    highest_utilization_route: RouteSummary = Field(
+        description=(
+            "Strategy with the highest logistics utilization, "
+            "measured as packages delivered per map unit travelled (stops / total_distance). "
+            "Indicates the most efficient use of vehicle movement."
+        ),
+    )
+    distance_saved: float = Field(
+        description="Distance units saved by choosing the shortest route over the longest",
+        examples=[4.2],
+    )
+    cost_saved: float = Field(
+        description="Cost units saved by choosing the cheapest route over the most expensive",
+        examples=[15.0],
+    )
+    recommended: RouteRecommendation = Field(
+        description=(
+            "Recommended route for this delivery based on a composite score "
+            "that balances total distance (50%) and total cost (50%). "
+            "Ties are broken in favour of: express > economic > strategic."
+        ),
+    )
+
+
 class AllRoutesResponse(BaseModel):
     express_route: RouteResponse = Field(
         description=(
@@ -84,5 +145,12 @@ class AllRoutesResponse(BaseModel):
             "Detours through the nearest secondary hub to group regional packages. "
             "Respects vehicle max_weight when building the regional cluster. "
             "Best choice when secondary hubs are available and regional consolidation is desired."
+        ),
+    )
+    comparison: RouteComparison = Field(
+        description=(
+            "Automatic cross-strategy comparison and logistics recommendation. "
+            "Use this section to decide which route best fits the current delivery context "
+            "without manually inspecting each strategy result."
         ),
     )

@@ -19,6 +19,7 @@ from app.schemas.route import (
     RouteResponse,
     VisitedHubResponse,
 )
+from app.services.route_comparison import RouteComparisonService
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
@@ -27,6 +28,7 @@ _package_repo = PackageRepository()
 _vehicle_repo = VehicleRepository()
 _registry = RouteStrategyRegistry()
 _executor = ThreadPoolExecutor()
+_comparison_service = RouteComparisonService()
 
 
 # ---------------------------------------------------------------------------
@@ -178,4 +180,9 @@ async def calculate_all_routes(body: RouteRequest) -> AllRoutesResponse:
         express_route=_build_response(express_result),
         economic_route=_build_response(economic_result),
         strategic_route=_build_response(strategic_result),
+        comparison=_comparison_service.compare(
+            express=_build_response(express_result),
+            economic=_build_response(economic_result),
+            strategic=_build_response(strategic_result),
+        ),
     )
